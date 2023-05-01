@@ -1,0 +1,56 @@
+<!--la pantalla de carga se mostrará mientras no haya Geolocalización-->
+<app-loading *ngIf="!locationReady; else ready"></app-loading>
+
+<!--En el momento en el que se encuentre geolocalización se cargará el resto de componentes por el else anterior-->
+<ng-template #ready>
+
+    <app-map></app-map>
+
+</ng-template>
+
+<div class="card">
+    <p-menubar [model]="items" class="menu">
+        <ng-template pTemplate="start">
+            <img src="./../../../../assets/gasoil.png" alt="logo" height="40" class="mr-2" />
+            <p-multiSelect class="selectMenu" 
+                           [options]="provincias" 
+                           optionLabel="name" 
+                           defaultLabel="Selecciona la Provincia" 
+                           [selectionLimit]="4" 
+                           [(ngModel)]="selectedProvincias"
+                           (onChange)="selectProvincia($event)">
+                <ng-template let-provincia pTemplate="selectedProvincia">
+                    {{provincia.name | titlecase}}
+                </ng-template>
+            </p-multiSelect>
+            <p-multiSelect class="selectMenu" 
+                           [options]="estaciones" 
+                           optionLabel="name" 
+                           defaultLabel="Selecciona la Estación" 
+                           [selectionLimit]="4" 
+                           [(ngModel)]="selectedEstaciones"
+                           (onChange)="selectEstacion($event)">
+                <ng-template let-estacion pTemplate="selectedEstacion">
+                    {{estacion.name | titlecase}}
+                </ng-template>
+            </p-multiSelect>
+        </ng-template>
+        <ng-template pTemplate="end">
+
+            <span class="p-input-icon-left">
+                <i class="pi pi-search"></i>
+                <input type="text" 
+                   pInputText 
+                   placeholder="Buscar..."
+                   class="search-input" 
+                   #txtQuery 
+                   (keyup)="onQueryChanged(txtQuery.value)"/>
+            </span>
+
+            <app-search-results *ngIf="infoReady"></app-search-results>
+            
+        </ng-template>
+    </p-menubar>
+</div>
+
+

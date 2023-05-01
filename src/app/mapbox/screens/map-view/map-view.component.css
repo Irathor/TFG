@@ -1,0 +1,43 @@
+.card{
+    width: 80%;
+    margin: 0 auto;
+    margin-top: 10px;
+    border-color: #75bef8;
+}
+
+app-search-results {
+    position: absolute;
+    top: 100%;
+    right: 20px;
+    z-index: 1;
+    background-color: #17212f;
+    border-radius: 3px;
+    border: 1px solid #75bef8;
+    width: 220px;
+    text-align: center;
+    padding-top: 10px;
+}
+
+.mr-2{
+    margin-right: 10px;
+    margin-left: 10px;
+}
+
+.search-input{
+    margin-right: 10px;
+}
+
+.search-input:focus{
+    outline: none; /* Desactiva el borde predeterminado */
+    box-shadow: 0 0 0 0.2rem #75bef8; /* Agrega un sombreado azul */
+    border-radius: 2px;
+}
+
+.p-menuitem-link:focus {
+    outline: none; /* Desactiva el borde predeterminado */
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* Agrega un sombreado azul */
+}
+
+.selectMenu{
+    margin-right: 10px;
+}
