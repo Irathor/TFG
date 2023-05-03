@@ -36,7 +36,7 @@ export class OilStationsService {
                                         +"&facet.range=Precio_Gasolina_95_E5"
                                         +"&facet.range=Precio_Gasolina_98_E5"
                                         +"&rows=1000");*/
-    console.log(solrRequest.provincias, solrRequest.estaciones)
+    //console.log(solrRequest.provincias, solrRequest.estaciones)
 
     if (!!solrRequest.provincias){
       
@@ -58,7 +58,7 @@ export class OilStationsService {
     } else if(!fq_provincias && !!fq_estaciones){
       fq = fq_estaciones;
     } else if(!!fq_provincias && !!fq_estaciones){
-      fq = fq_provincias + ' AND ' + fq_estaciones;
+      fq = '(' + fq_provincias + ')' +' AND ' + '(' + fq_estaciones + ')';
     }
 
     if (fq == ''){
@@ -67,7 +67,7 @@ export class OilStationsService {
       this.solr.numRows= 11880;
     }
 
-    console.log(this.solr.numRows, fq, fq_estaciones, fq_provincias)
+    console.log(fq)
 
     return this.solr.get<OilStations>(`&fq=${fq}`);
     /*return this.solr.get<OilStations>(`&fq=${fq}&facet.range.start=0&facet.range.end=3&facet.range.gap=0.5` 
