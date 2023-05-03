@@ -20,7 +20,7 @@ export class SolrApiClient extends HttpClient {
         'facet.range': ['Precio_Gasoleo_A', 'Precio_Gasoleo_Premium', 'Precio_Gasolina_95_E5', 'Precio_Gasolina_98_E5']
     }
 
-    constructor( handler: HttpHandler){
+    constructor(handler: HttpHandler){
         super(handler);
     }
 

@@ -42,14 +42,11 @@ export class OilStationsService {
       
       fq_provincias += solrRequest.provincias.map(p => 'Provincia_str:"' + p +'"').join(' OR ');
 
-      console.log(fq)
     }
 
     if (!!solrRequest.estaciones){
 
       fq_estaciones += solrRequest.estaciones.map(p => 'Estacion_str:"' + p +'"').join(' OR ');
-
-      console.log(fq)
 
     }
 
