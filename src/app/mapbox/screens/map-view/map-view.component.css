@@ -41,3 +41,13 @@ app-search-results {
 .selectMenu{
     margin-right: 10px;
 }
+
+.filtros{
+    display: flex;
+}
+
+.slider{
+    width: 213px;
+    margin-right: 35px;
+    margin-left: 20px;
+}

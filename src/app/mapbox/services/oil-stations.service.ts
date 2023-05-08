@@ -18,6 +18,7 @@ export class OilStationsService {
     let fq: string = '';
     let fq_provincias: string = '';
     let fq_estaciones: string = '';
+    let fq_precio: string = '';
     //Si el objeto de búsqueda tiene el filtro estación añadimos el filtro correspondiente
     //this.fq='&fq=Estacion:repsol';
     //this.fq="&fq=Latitud:[40.3 TO 43.8]&fq=Longitud:[-3.73 TO -2.42]"
@@ -38,33 +39,71 @@ export class OilStationsService {
                                         +"&rows=1000");*/
     //console.log(solrRequest.provincias, solrRequest.estaciones)
 
-    if (!!solrRequest.provincias){
+    if (!!solrRequest.provincias && solrRequest.provincias.length > 0){
       
       fq_provincias += solrRequest.provincias.map(p => 'Provincia_str:"' + p +'"').join(' OR ');
 
+      if (fq == ''){
+        fq = '(' + fq_provincias + ')';
+      }else{
+        fq = fq + ' AND (' + fq_provincias + ')';
+      }
+
     }
 
-    if (!!solrRequest.estaciones){
+    if (!!solrRequest.estaciones && solrRequest.estaciones.length > 0){
 
+      console.log(solrRequest.estaciones)
       fq_estaciones += solrRequest.estaciones.map(p => 'Estacion_str:"' + p +'"').join(' OR ');
 
+      console.log('estaciones ' + fq_estaciones)
+      if (fq === ''){
+        fq = '(' + fq_estaciones + ')';
+      }else{
+        fq = fq + ' AND (' + fq_estaciones + ')';
+      }
+
     }
 
-    if (!!fq_provincias && !fq_estaciones){
+    if (!!solrRequest.precio){
+
+      let min = !!solrRequest.precio[0] ? solrRequest.precio[0] : '*';
+      let max = !!solrRequest.precio[1] ? solrRequest.precio[1]: '*';
+
+      fq_precio = '(Precio_Gasoleo_A:[' + solrRequest.precio[0] + ' TO ' + solrRequest.precio[1] + '] OR ' 
+                  + 'Precio_Gasoleo_Premium:[' + solrRequest.precio[0] + ' TO ' + solrRequest.precio[1] + '] OR '
+                  + 'Precio_Gasolina_95_E5:[' + solrRequest.precio[0] + ' TO ' + solrRequest.precio[1] + '] OR '
+                  + 'Precio_Gasolina_98_E5:[' + solrRequest.precio[0] + ' TO ' + solrRequest.precio[1] + '])';
+
+      if (fq === ''){
+        fq = fq_precio;
+      }else{
+        fq = fq + ' AND ' + fq_precio;
+      }
+
+    }
+
+    
+
+    /*if (!!fq_provincias && !fq_estaciones){
       fq = fq_provincias;
     } else if(!fq_provincias && !!fq_estaciones){
-      fq = fq_estaciones;
+      fq = fq + ' AND ' + fq_estaciones;
     } else if(!!fq_provincias && !!fq_estaciones){
-      fq = '(' + fq_provincias + ')' +' AND ' + '(' + fq_estaciones + ')';
-    }
+      fq = fq + ' AND ' + '(' + fq_provincias + ')' +' AND ' + '(' + fq_estaciones + ')';
+    }*/
 
-    if (fq == ''){
+    /*if (fq == ''){
       this.solr.numRows= 0;
     }else{
       this.solr.numRows= 11880;
-    }
+    }*/
 
-    console.log(fq)
+    if (!!fq_estaciones || !!fq_provincias){
+      this.solr.numRows= 11880;
+    }else{
+      this.solr.numRows= 0;
+    }
 
     return this.solr.get<OilStations>(`&fq=${fq}`);
     /*return this.solr.get<OilStations>(`&fq=${fq}&facet.range.start=0&facet.range.end=3&facet.range.gap=0.5` 

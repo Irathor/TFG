@@ -11,29 +11,44 @@
 <div class="card">
     <p-menubar [model]="items" class="menu">
         <ng-template pTemplate="start">
-            <img src="./../../../../assets/gasoil.png" alt="logo" height="40" class="mr-2" />
-            <p-multiSelect class="selectMenu" 
-                           [options]="provincias" 
-                           optionLabel="name" 
-                           defaultLabel="Selecciona la Provincia" 
-                           [selectionLimit]="4" 
-                           [(ngModel)]="selectedProvincias"
-                           (onChange)="selectProvincia($event)">
-                <ng-template let-provincia pTemplate="selectedProvincia">
-                    {{provincia.name | titlecase}}
-                </ng-template>
-            </p-multiSelect>
-            <p-multiSelect class="selectMenu" 
-                           [options]="estaciones" 
-                           optionLabel="name" 
-                           defaultLabel="Selecciona la Estación" 
-                           [selectionLimit]="4" 
-                           [(ngModel)]="selectedEstaciones"
-                           (onChange)="selectEstacion($event)">
-                <ng-template let-estacion pTemplate="selectedEstacion">
-                    {{estacion.name | titlecase}}
-                </ng-template>
-            </p-multiSelect>
+            <div class="filtros">
+                <img src="./../../../../assets/gasoil.png" alt="logo" height="40" class="mr-2" />
+                <div>
+                    <p-multiSelect class="selectMenu" 
+                                   [options]="provincias" 
+                                   optionLabel="name" 
+                                   defaultLabel="Selecciona la Provincia" 
+                                   [selectionLimit]="4" 
+                                   [(ngModel)]="selectedProvincias"
+                                   (onChange)="selectProvincia($event)">
+                        <ng-template let-provincia pTemplate="selectedProvincia">
+                            {{provincia.name | titlecase}}
+                        </ng-template>
+                    </p-multiSelect>
+                </div>
+                <div>
+                    <p-multiSelect class="selectMenu" 
+                                   [options]="estaciones" 
+                                   optionLabel="name" 
+                                   defaultLabel="Selecciona la Estación" 
+                                   [selectionLimit]="4" 
+                                   [(ngModel)]="selectedEstaciones"
+                                   (onChange)="selectEstacion($event)">
+                        <ng-template let-estacion pTemplate="selectedEstacion">
+                            {{estacion.name | titlecase}}
+                        </ng-template>
+                    </p-multiSelect>
+                </div>
+                <div class="slider filtro">
+                    <h5>Precio: {{selectedPrecios[0] + '€ - ' + selectedPrecios[1] + '€'}}</h5>
+                    <p-slider [(ngModel)]="selectedPrecios" 
+                              [range]="true"
+                              [min]="0.00"
+                              [max]="3.00"
+                              [step]="0.01"
+                              (onSlideEnd)="selectPrecio($event)"></p-slider>
+                </div>
+            </div>
         </ng-template>
         <ng-template pTemplate="end">
 

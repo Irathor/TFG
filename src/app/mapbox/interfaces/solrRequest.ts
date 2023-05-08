@@ -1,4 +1,5 @@
 export interface SolrRequest{
     provincias?: string[],
-    estaciones?: string[]
+    estaciones?: string[],
+    precio?: number[]
 }

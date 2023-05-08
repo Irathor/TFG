@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { MenubarModule } from 'primeng/menubar';
 import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { SliderModule } from 'primeng/slider';
 
 
 
@@ -19,7 +20,8 @@ import { MultiSelectModule } from 'primeng/multiselect';
     MenubarModule,
     InputTextModule,
     FormsModule,
-    MultiSelectModule
+    MultiSelectModule,
+    SliderModule
   ]
 })
 export class PrimeNGModule { }

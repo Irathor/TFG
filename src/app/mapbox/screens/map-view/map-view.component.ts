@@ -17,9 +17,10 @@ export class MapViewComponent implements OnInit{
   items!: MenuItem[];
   provincias!: Facet[];
   estaciones!: Facet[];
-
+  
   selectedProvincias: string[] = [];
   selectedEstaciones: string[] = [];
+  selectedPrecios: number[] = [0, 3];
   
   private debounceTimer?: NodeJS.Timeout;
   public infoReady: boolean = false;
@@ -27,40 +28,9 @@ export class MapViewComponent implements OnInit{
   ngOnInit(): void {
 
     this.items = [
-      /*{
-          label: 'Filtros',
-          icon: 'pi pi-fw pi-filter',
-          items: [
-              {
-                  label: 'Provincia',
-                  icon: 'pi pi-fw pi-map',
-                  items: [
-                      {
-                          label: 'La más barata',
-                          icon: 'pi pi-fw pi-bookmark'
-                      },
-                      {
-                          label: 'Estación',
-                          icon: 'pi pi-fw pi-video'
-                      }
-                  ]
-              },
-              {
-                  label: 'Delete',
-                  icon: 'pi pi-fw pi-trash'
-              },
-              {
-                  separator: true
-              },
-              {
-                  label: 'La más barata de todas',
-                  icon: 'pi pi-fw pi-euro'
-              }
-          ]
-      },*/
       {
           label: 'Centrar',
-          icon: 'pi pi-fw pi-user',
+          icon: 'pi pi-fw pi-user', id: 'botonCentrar',
           command: () => {
             if(!this.geolocationsService.locationReady){
               throw Error('No se ha podido Geolocalizar');
@@ -117,7 +87,7 @@ export class MapViewComponent implements OnInit{
 
   selectProvincia(event: any){
 
-    let req: SolrRequest = {provincias: event.value.map((item: any) => item.name), estaciones: this.selectedEstaciones.map((item: any) => item.name)};
+    let req: SolrRequest = {provincias: event.value.map((item: any) => item.name), estaciones: this.selectedEstaciones.map((item: any) => item.name), precio: this.selectedPrecios};
 
     this.geolocationsService.getOilStations(req).subscribe();
 
@@ -125,10 +95,17 @@ export class MapViewComponent implements OnInit{
 
   selectEstacion(event: any){
 
-    let req: SolrRequest = {provincias: this.selectedProvincias.map((item: any) => item.name), estaciones: event.value.map((item: any) => item.name)};
+    let req: SolrRequest = {provincias: this.selectedProvincias.map((item: any) => item.name), estaciones: event.value.map((item: any) => item.name), precio: this.selectedPrecios};
 
     this.geolocationsService.getOilStations(req).subscribe();
 
+  }
+
+  selectPrecio(event: any){
+
+    let req: SolrRequest = {provincias: this.selectedProvincias.map((item: any) => item.name), estaciones: this.selectedEstaciones.map((item: any) => item.name), precio: event.values};
+
+    this.geolocationsService.getOilStations(req).subscribe();
   }
 
 }
