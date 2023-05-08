@@ -46,6 +46,10 @@ app-search-results {
     display: flex;
 }
 
+.precioLabel{
+    color: rgba(255, 255, 255, 0.77);
+}
+
 .slider{
     width: 213px;
     margin-right: 35px;

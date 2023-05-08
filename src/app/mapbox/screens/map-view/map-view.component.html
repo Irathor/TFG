@@ -40,7 +40,7 @@
                     </p-multiSelect>
                 </div>
                 <div class="slider filtro">
-                    <h5>Precio: {{selectedPrecios[0] + '€ - ' + selectedPrecios[1] + '€'}}</h5>
+                    <h5 class="precioLabel">Precio: {{selectedPrecios[0] + '€ - ' + selectedPrecios[1] + '€'}}</h5>
                     <p-slider [(ngModel)]="selectedPrecios" 
                               [range]="true"
                               [min]="0.00"
