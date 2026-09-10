@@ -227,10 +227,13 @@ export class MapService {
       filter: ['has', 'point_count'],
       layout: {
         'text-field': buildClusterLabelExpression(this.selectedFuel) as any,
+        // Fuente del propio estilo de OpenFreeMap: sin esto, MapLibre usa un
+        // fallback por defecto que ese servidor de glifos no tiene (404 en consola).
+        'text-font': ['Noto Sans Bold'],
         'text-size': 12
       },
       paint: {
-        'text-color': '#1c1c1c'
+        'text-color': '#ffffff'
       }
     });
 
@@ -424,14 +427,7 @@ export class MapService {
       const directionsBtn = document.createElement('button');
       directionsBtn.type = 'button';
       directionsBtn.textContent = 'Cómo llegar';
-      directionsBtn.style.marginTop = '8px';
-      directionsBtn.style.width = '100%';
-      directionsBtn.style.padding = '4px 0';
-      directionsBtn.style.border = '1px solid #75bef8';
-      directionsBtn.style.borderRadius = '3px';
-      directionsBtn.style.background = 'none';
-      directionsBtn.style.color = 'inherit';
-      directionsBtn.style.cursor = 'pointer';
+      directionsBtn.className = 'directions-btn';
       directionsBtn.addEventListener('click', () => {
         this.directionsRequestHandler?.(destination);
         this.stationPopup?.remove();

@@ -121,6 +121,31 @@ app-search-results {
     border-radius: 3px;
     padding: 6px 14px;
     font-size: 0.85rem;
+    animation: fadeOutLocationNotice 0.8s ease-in 5s forwards;
+}
+
+@keyframes fadeOutLocationNotice{
+    to{ opacity: 0; }
+}
+
+/* El menú superior se atenúa cuando el ratón lleva 3s fuera de él, y vuelve
+   a ser sólido en 0,5s en cuanto el ratón vuelve a pasar por encima. */
+.menu{
+    transition: opacity 0.5s ease;
+}
+
+.menu:not(:hover){
+    animation: menuFadeToTranslucent 0.5s ease forwards;
+    animation-delay: 3s;
+}
+
+.menu:hover{
+    opacity: 1;
+}
+
+@keyframes menuFadeToTranslucent{
+    from{ opacity: 1; }
+    to{ opacity: 0.35; }
 }
 
 .oil-stations-status{

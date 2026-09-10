@@ -114,15 +114,16 @@ de más — nunca un mapa vacío.
 
 ## Funcionalidades
 
-- **Mapa con clustering nativo de MapLibre GL** (no un marcador DOM por gasolinera — con ~11.500 estaciones eso es lo que colapsaba el navegador en la versión original). Los clusters muestran el nº de gasolineras y el precio medio del combustible seleccionado.
+- **Mapa con clustering nativo de MapLibre GL** (no un marcador DOM por gasolinera — con ~11.500 estaciones eso es lo que colapsaba el navegador en la versión original). Los clusters muestran el nº de gasolineras y el precio medio del combustible seleccionado, en texto blanco y negrita (`text-font: ['Noto Sans Bold']` — hay que fijarlo explícitamente porque el servidor de glifos de OpenFreeMap no sirve el fallback por defecto de MapLibre).
 - **Filtros** por provincia, marca, combustible y rango de precio, combinables entre sí. El combustible elegido determina sobre qué precio filtra, el precio medio de los clusters, y qué gasolinera cuenta como "más barata en ruta".
 - **"Cerca de mí"**: filtra a un radio de 10 km de la posición del usuario (o de Madrid, si no se pudo geolocalizar — ver abajo).
 - **Favoritas**: se marcan desde el popup de cada gasolinera (★), guardadas en `localStorage` del navegador (no requieren backend ni login). El botón "Favoritas" del menú filtra el mapa para mostrar solo las guardadas, con un contador.
-- **Gasolinera más barata en ruta**: al trazar una ruta (OSRM, botón "Cómo llegar" del popup), se resalta la gasolinera más barata (según el combustible seleccionado) a menos de 2 km del trayecto.
+- **Gasolinera más barata en ruta**: al trazar una ruta (OSRM, botón "Cómo llegar" del popup, con estilo propio en `.directions-btn` de `src/styles.css`) se resalta la gasolinera más barata (según el combustible seleccionado) a menos de 2 km del trayecto.
 - **Horario**: el popup de cada gasolinera muestra si está abierta ahora mismo, interpretando el campo `Horario` de la API del Gobierno (cubre los formatos "24h" y "incluye un rango, mismo horario todos los días"; si el formato es más complejo se muestra el texto tal cual).
-- **Fallback de geolocalización**: si se deniega el permiso o el navegador no la soporta, la app centra en Madrid en vez de quedarse bloqueada en la pantalla de carga, con un aviso visible.
+- **Fallback de geolocalización**: si se deniega el permiso o el navegador no la soporta, la app centra en Madrid en vez de quedarse bloqueada en la pantalla de carga, con un aviso visible que se desvanece solo a los 5 segundos (`fadeOutLocationNotice` en `map-view.component.css`) para no quedar estorbando de forma permanente.
 - **Filtros recordados**: provincia, marca, precio y combustible se guardan en `localStorage` y se restauran en la siguiente visita.
 - **Feedback de carga y de "sin resultados"**: spinner mientras se pide al backend, aviso si una combinación de filtros no devuelve ninguna gasolinera.
+- **Menú superior discreto**: si el ratón lleva 3 segundos fuera del menú de filtros, este se atenúa (opacidad 0,35) para dejar más protagonismo al mapa, y recupera su opacidad completa en 0,5s en cuanto el ratón vuelve a pasar por encima (`.menu` en `map-view.component.css`, con `:hover` + `animation-delay`).
 - **Responsive**: la barra de filtros se adapta (se apila) en pantallas estrechas.
 
 ## Rendimiento

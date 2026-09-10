@@ -1,3 +1,28 @@
 *{
     font-family: 'Roboto', sans-serif;
 }
+
+/* Botón "Cómo llegar" del popup de una gasolinera (MapService lo crea con
+   document.createElement, fuera de una plantilla de Angular, así que necesita
+   una clase global en vez de un CSS de componente con ámbito). */
+.directions-btn{
+    margin-top: 8px;
+    width: 100%;
+    padding: 4px 0;
+    border: 1px solid #1976d2;
+    border-radius: 3px;
+    background-color: #1976d2;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.directions-btn:hover{
+    background-color: #2196f3;
+    border-color: #2196f3;
+}
+
+.directions-btn:active{
+    background-color: #0d47a1;
+    border-color: #0d47a1;
+}
