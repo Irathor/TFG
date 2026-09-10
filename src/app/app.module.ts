@@ -1,25 +1,23 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { provideHttpClient, withFetch } from '@angular/common/http';
+import { providePrimeNG } from 'primeng/config';
+import Aura from '@primeng/themes/aura';
 
 import { AppComponent } from './app.component';
-import { HttpClientModule } from '@angular/common/http';
 
 //Módulo de MapBox
 import { MapboxModule } from './mapbox/mapbox.module';
 
-
 @NgModule({
-  declarations: [
-    AppComponent
+  declarations: [AppComponent],
+  bootstrap: [AppComponent],
+  // Sin BrowserAnimationsModule: ni nuestro código ni PrimeNG 21 (usa
+  // transiciones CSS) dependen de @angular/animations — evita cargarlo entero.
+  imports: [BrowserModule, MapboxModule],
+  providers: [
+    provideHttpClient(withFetch()),
+    providePrimeNG({ theme: { preset: Aura, options: { darkModeSelector: '.app-dark' } } }),
   ],
-  imports: [
-    BrowserModule,
-    BrowserAnimationsModule,
-    MapboxModule,
-    HttpClientModule
-  ],
-  providers: [],
-  bootstrap: [AppComponent]
 })
 export class AppModule { }

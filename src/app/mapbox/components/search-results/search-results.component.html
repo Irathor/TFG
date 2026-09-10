@@ -1,21 +1,27 @@
-<div *ngIf="isLoadingPlaces"
-     class="alert alert-primary mt-2 text-center carga">
+@if (isLoadingPlaces) {
+  <div
+    class="alert alert-primary mt-2 text-center carga">
     <i class="pi pi-spinner pi-spin"></i>
     <span> Cargando</span>
-</div>
+  </div>
+}
 
-<ul *ngIf="places.length > 0"
+@if (places.length > 0) {
+  <ul
     class="list-group mt-2">
-    <li *ngFor="let place of places"
+    @for (place of places; track place) {
+      <li
         class="list-group-item list-group-item-action pointer"
         [class.active]="place.id === selectedId"
         (click)="flyTo(place)">
-        <span class="titulo">{{ place.text_es | titlecase }}</span>
+        <span class="titulo">{{ place.text | titlecase }}</span>
         <p>
-            {{ place.place_name }}
+          {{ place.place_name }}
         </p>
         <button class="btn btn-sm"
-                (click)="getDirections(place)"
-                [ngClass]="(place.id === selectedId) ? 'btn-outline-light' : 'btn-outline-primary' ">Ir a</button>
-    </li>
-</ul>
+          (click)="getDirections(place)"
+        [ngClass]="(place.id === selectedId) ? 'btn-outline-light' : 'btn-outline-primary' ">Ir a</button>
+      </li>
+    }
+  </ul>
+}

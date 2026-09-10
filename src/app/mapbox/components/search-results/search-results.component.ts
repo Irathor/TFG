@@ -3,9 +3,10 @@ import { Feature } from '../../interfaces/places';
 import { MapService, GeolocationsService } from '../../services';
 
 @Component({
-  selector: 'app-search-results',
-  templateUrl: './search-results.component.html',
-  styleUrls: ['./search-results.component.css']
+    selector: 'app-search-results',
+    templateUrl: './search-results.component.html',
+    styleUrls: ['./search-results.component.css'],
+    standalone: false
 })
 export class SearchResultsComponent {
 

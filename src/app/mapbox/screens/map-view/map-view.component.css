@@ -46,6 +46,59 @@ app-search-results {
     display: flex;
 }
 
+.map-actions{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 12px;
+}
+
+.icon-action-btn{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 3px;
+    background: none;
+    color: rgba(255, 255, 255, 0.77);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.icon-action-btn:hover{
+    background-color: rgba(117, 190, 248, 0.15);
+    color: #ffffff;
+}
+
+.icon-action-btn:focus-visible{
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.icon-action-btn.active{
+    color: #75bef8;
+    background-color: rgba(117, 190, 248, 0.15);
+}
+
+.favorites-badge{
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background-color: #fdd835;
+    color: #17212f;
+    font-size: 0.65rem;
+    line-height: 14px;
+    font-weight: bold;
+}
+
 .precioLabel{
     color: rgba(255, 255, 255, 0.77);
 }
@@ -54,4 +107,76 @@ app-search-results {
     width: 213px;
     margin-right: 35px;
     margin-left: 20px;
+}
+
+.default-location-notice{
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    background-color: #17212f;
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid #75bef8;
+    border-radius: 3px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+}
+
+.oil-stations-status{
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #17212f;
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid #75bef8;
+    border-radius: 3px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+}
+
+.status-spinner{
+    width: 18px;
+    height: 18px;
+}
+
+/* Oculta visualmente pero mantiene accesible para lectores de pantalla. */
+.sr-only{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 900px){
+    .filtros{
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .slider{
+        margin-left: 0;
+        margin-right: 10px;
+    }
+
+    .card{
+        width: 95%;
+    }
+
+    .default-location-notice,
+    .oil-stations-status{
+        position: static;
+        transform: none;
+        margin: 6px auto;
+        width: fit-content;
+    }
 }

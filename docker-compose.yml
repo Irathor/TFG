@@ -1,0 +1,30 @@
+services:
+  solr:
+    image: solr:9.2
+    restart: unless-stopped
+    ports:
+      - "8983:8983"
+    volumes:
+      - solr_data:/var/solr
+    command: ["solr-precreate", "oilStations"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8983/solr/oilStations/admin/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      SOLR_URL: http://solr:8983
+      SOLR_COLLECTION: oilStations
+      CORS_ORIGINS: '["http://localhost:4200"]'
+    depends_on:
+      solr:
+        condition: service_healthy
+
+volumes:
+  solr_data:

@@ -2,29 +2,27 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
+    "rootDir": "./src",
     "outDir": "./dist/out-tsc",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "esModuleInterop": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "sourceMap": true,
     "declaration": false,
-    "downlevelIteration": true,
     "experimentalDecorators": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "importHelpers": true,
-    "target": "es2020",
-    "module": "es2020",
-    "allowSyntheticDefaultImports": true, //Hay que añadir esta línea para poder importar los módulos de Mapbox
-    "lib": [
-      "es2020",
-      "dom"
-    ],
+    "target": "es2022",
+    "module": "preserve",
     "types": [
-      "node"
+      "node",
+      "geojson"
     ]
   },
   "angularCompilerOptions": {

@@ -1,12 +1,17 @@
 import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 
-import mapboxgl from 'mapbox-gl';
+import { Map, Marker, Popup } from 'maplibre-gl';
 import { GeolocationsService, MapService } from '../../services';
 
+// Estilo oscuro de OpenFreeMap: gratuito, sin token ni registro.
+// https://openfreemap.org
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
+
 @Component({
-  selector: 'app-map',
-  templateUrl: './map.component.html',
-  styleUrls: ['./map.component.css']
+    selector: 'app-map',
+    templateUrl: './map.component.html',
+    styleUrls: ['./map.component.css'],
+    standalone: false
 })
 export class MapComponent implements AfterViewInit {
 
@@ -23,20 +28,20 @@ export class MapComponent implements AfterViewInit {
     if(!this.geolocationsService.userLocation) {
       throw Error('No se ha podido geolocalizar');
     }
-    
-    const map = new mapboxgl.Map({
+
+    const map = new Map({
       container: this.principalElement?.nativeElement,
-      style: 'mapbox://styles/mapbox/navigation-guidance-night-v2', // style del mapa
+      style: MAP_STYLE_URL,
       center: this.geolocationsService.userLocation,
       zoom: 14
     });
 
-    const popup = new mapboxgl.Popup({closeButton: false, 
+    const popup = new Popup({closeButton: false,
                                       className: 'popup'})
       .setHTML(`<strong>${this.geolocationsService.userLocation}</strong>`);
 
 
-    const myMarker = new mapboxgl.Marker({color: '#FFDAB9'})
+    new Marker({color: '#FFDAB9'})
       .setLngLat(this.geolocationsService.userLocation)
       .setPopup(popup)
       .addTo(map)

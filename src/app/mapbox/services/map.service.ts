@@ -1,31 +1,127 @@
 import { Injectable } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 
-import { AnySourceData, LngLatBounds, LngLatLike, Map, Marker, Popup } from 'mapbox-gl';
+import {
+  GeoJSONSource,
+  GeoJSONSourceSpecification,
+  LngLatBounds,
+  LngLatLike,
+  Map,
+  MapLayerMouseEvent,
+  Marker,
+  Popup
+} from 'maplibre-gl';
 import { Feature } from '../interfaces/places';
 import { DirectionsApiClient } from '../api';
-import { DirectionsResponse, Route } from '../interfaces/directions';
-import { Doc } from '../interfaces/oilstations';
+import { Route } from '../interfaces/directions';
+import { OilStationFeature, OilStationProperties, OilStationsCollection } from '../interfaces/oilstations';
+import { FUEL_LABEL, FUEL_PROPERTY, FuelKey } from '../interfaces/fuel';
+import { describeSchedule } from '../utils/schedule';
+import { FavoritesService } from './favorites.service';
+
+// Identificadores de la fuente/capas de gasolineras en el estilo del mapa.
+const OIL_STATIONS_SOURCE = 'oil-stations';
+const CLUSTERS_LAYER = 'oil-stations-clusters';
+const CLUSTER_COUNT_LAYER = 'oil-stations-cluster-count';
+const UNCLUSTERED_LAYER = 'oil-stations-unclustered';
+
+const DEFAULT_FUEL: FuelKey = 'gasoleo_a';
+const ROUTE_BUFFER_KM = 2;
+
+// Color por marca para los puntos individuales (mismo criterio que antes,
+// ahora expresado como una expresión del estilo en vez de JS por marcador).
+const BRAND_COLOR_MATCH: any[] = [
+  'match', ['get', 'Estacion'],
+  'REPSOL', '#03a9f4',
+  'CAMPSA', '#e53935',
+  'PETRONOR', '#1e88e5',
+  'CEPSA', '#fb8c00',
+  'SHELL', '#fdd835',
+  'GALP', '#8e24aa',
+  'BP', '#43a047',
+  '#9e9e9e' // color por defecto para el resto de marcas
+];
+
+/** Suma/conteo por combustible acumulados por cluster (los 4 a la vez, es barato). */
+function buildClusterProperties(): Record<string, any> {
+  const properties: Record<string, any> = {};
+
+  for (const fuel of Object.keys(FUEL_PROPERTY) as FuelKey[]) {
+    const field = FUEL_PROPERTY[fuel];
+    properties[`sum_${fuel}`] = ['+', ['case', ['has', field], ['get', field], 0], ['accumulated']];
+    properties[`count_${fuel}`] = ['+', ['case', ['has', field], 1, 0], ['accumulated']];
+  }
+
+  return properties;
+}
+
+/** "42 · 1.75€" con el precio medio del combustible seleccionado, o solo el conteo si el cluster no tiene datos de ese combustible. */
+function buildClusterLabelExpression(fuel: FuelKey): any[] {
+  const sumKey = `sum_${fuel}`;
+  const countKey = `count_${fuel}`;
+  const average = ['/', ['get', sumKey], ['max', ['get', countKey], 1]];
+  const rounded = ['/', ['round', ['*', average, 100]], 100];
+
+  return [
+    'case',
+    ['>', ['get', countKey], 0],
+    ['concat', ['get', 'point_count_abbreviated'], ' · ', ['to-string', rounded], '€'],
+    ['to-string', ['get', 'point_count_abbreviated']]
+  ];
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class MapService {
 
-  private map?:Map;
+  private map?: Map;
   private markers: Marker[] = [];
+  private stationPopup?: Popup;
+  private cheapestOnRouteMarker?: Marker;
+
+  private selectedFuel: FuelKey = DEFAULT_FUEL;
+  private favoritesOnly = false;
+
+  // Última colección recibida de la API (sin filtrar por favoritas), y la
+  // que realmente está pintada en el mapa (esa sí, filtrada si "solo
+  // favoritas" está activo) — la ruta más barata busca sobre esta última.
+  private latestFetchedCollection?: OilStationsCollection;
+  private renderedOilStations?: OilStationsCollection;
+
+  // Las gasolineras pueden llegar de la API antes de que el mapa exista
+  // (la geolocalización es asíncrona y puede tardar más que la petición al
+  // backend). Se guarda aquí el último dato a renderizar y se aplica en
+  // cuanto el mapa y sus capas estén listos, en vez de perderlo o lanzar un error.
+  private pendingOilStations?: OilStationsCollection;
+
+  // GeolocationsService lo rellena (conoce la posición del usuario); así el
+  // popup puede pedir una ruta sin que MapService dependa de GeolocationsService
+  // (evita una dependencia circular entre ambos servicios).
+  private directionsRequestHandler?: (destination: [number, number]) => void;
 
   get isMapReady(){
     return !!this.map;
   }
 
   constructor(
-    private directionsApi: DirectionsApiClient,
-    private currencyPipe: CurrencyPipe
+    private readonly directionsApi: DirectionsApiClient,
+    private readonly currencyPipe: CurrencyPipe,
+    private readonly favoritesService: FavoritesService
     ){}
 
   setMap(map: Map){
     this.map = map;
+    this.map.on('load', () => {
+      this.setupOilStationsLayers();
+      if(this.pendingOilStations){
+        this.applyOilStations(this.pendingOilStations);
+      }
+    });
+  }
+
+  setDirectionsHandler(handler: (destination: [number, number]) => void){
+    this.directionsRequestHandler = handler;
   }
 
   flyto(coords:LngLatLike){
@@ -79,72 +175,279 @@ export class MapService {
     })
   }
 
-  createMarkersFromOilStations( places: Doc[] ){
-
-    if( !this.map ){
-      throw Error('Mapa no inicializado');
-    }
-
-    this.markers.forEach( marker => marker.remove() );
-    const newMarkers = [];
-
-    for(const place of places) {
-
-      const coloresEstaciones: Record<string, string> = {
-        REPSOL: '#03a9f4',
-        CAMPSA: 'red',
-        PETRONOR: 'blue',
-        CEPSA: 'orange',
-        SHELL: 'yellow',
-        GALP: 'purple',
-        BP: 'green'
-      };
-      
-      let color = coloresEstaciones[place.Estacion as keyof typeof coloresEstaciones];
-      
-      if (!color) {
-        // Si la clave no está en el objeto, asignamos un color por defecto
-        color = 'grey';
-      }
-
-      const [ lng, lat ] = [place.Longitud, place.Latitud];
-      const popup = new Popup()
-              .setHTML(`
-                <div style="text-align: center">
-                  <h6><strong>${ place.Estacion }</strong><br></h6>
-                </div>
-                ${ place.Precio_Gasoleo_A != null ? '<span>Precio Gasóleo A: ' + this.currencyPipe.transform(place.Precio_Gasoleo_A, 'EUR')+'<br></span>' : '' }
-                ${ place.Precio_Gasoleo_Premium != null ? '<span>Precio Gasóleo Premium: '+ this.currencyPipe.transform(place.Precio_Gasoleo_Premium, 'EUR')+'<br></span>' : '' }
-                ${ place.Precio_Gasolina_95_E5 != null ? '<span>Precio Gasolina 95: '+ this.currencyPipe.transform(place.Precio_Gasolina_95_E5, 'EUR')+'<br></span>' : '' }
-                ${ place.Precio_Gasolina_98_E5 != null ? '<span>Precio Gasolina 98: '+ this.currencyPipe.transform(place.Precio_Gasolina_98_E5, 'EUR')+'<br></span>' : '' }
-              `);
-
-
-
-      const newMarker = new Marker({color: color})
-                .setLngLat([lng, lat])
-                .setPopup( popup )
-                .addTo( this.map );
-
-      newMarkers.push( newMarker );
-      
-    }
-
-    this.markers = newMarkers;
-
-    if( places.length === 0 ) {
+  /**
+   * Registra la fuente GeoJSON y las capas de clustering de gasolineras.
+   * Se llama una vez, al cargar el estilo del mapa; setOilStations() solo
+   * actualiza los datos de la fuente a partir de ahí.
+   */
+  private setupOilStationsLayers(){
+    if(!this.map){
       return;
+    }
+
+    const oilStationsSource: GeoJSONSourceSpecification = {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+      clusterProperties: buildClusterProperties()
+    };
+    this.map.addSource(OIL_STATIONS_SOURCE, oilStationsSource);
+
+    // Burbujas de cluster: tamaño y color crecen con el nº de gasolineras agrupadas.
+    this.map.addLayer({
+      id: CLUSTERS_LAYER,
+      type: 'circle',
+      source: OIL_STATIONS_SOURCE,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step', ['get', 'point_count'],
+          '#51bbd6', 50,
+          '#f1a13a', 200,
+          '#f2543a'
+        ],
+        'circle-radius': [
+          'step', ['get', 'point_count'],
+          16, 50,
+          22, 200,
+          28
+        ],
+        'circle-opacity': 0.85,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
+      }
+    });
+
+    this.map.addLayer({
+      id: CLUSTER_COUNT_LAYER,
+      type: 'symbol',
+      source: OIL_STATIONS_SOURCE,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': buildClusterLabelExpression(this.selectedFuel) as any,
+        'text-size': 12
+      },
+      paint: {
+        'text-color': '#1c1c1c'
+      }
+    });
+
+    // Gasolineras individuales, coloreadas por marca.
+    this.map.addLayer({
+      id: UNCLUSTERED_LAYER,
+      type: 'circle',
+      source: OIL_STATIONS_SOURCE,
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': BRAND_COLOR_MATCH as any,
+        'circle-radius': 7,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
+      }
+    });
+
+    this.map.on('click', CLUSTERS_LAYER, (e) => this.onClusterClick(e));
+    this.map.on('click', UNCLUSTERED_LAYER, (e) => this.onStationClick(e));
+
+    for (const layer of [CLUSTERS_LAYER, UNCLUSTERED_LAYER]) {
+      this.map.on('mouseenter', layer, () => this.setCursor('pointer'));
+      this.map.on('mouseleave', layer, () => this.setCursor(''));
     }
   }
 
+  private setCursor(cursor: string){
+    if(this.map){
+      this.map.getCanvas().style.cursor = cursor;
+    }
+  }
+
+  /** Cambia el combustible usado para el precio medio de los clusters y la ruta más barata. */
+  setFuelField(fuel: FuelKey){
+    this.selectedFuel = fuel;
+
+    if(this.map?.getLayer(CLUSTER_COUNT_LAYER)){
+      this.map.setLayoutProperty(CLUSTER_COUNT_LAYER, 'text-field', buildClusterLabelExpression(fuel) as any);
+    }
+  }
+
+  /** Muestra solo las gasolineras favoritas (entre las últimas recibidas de la API), o todas de nuevo. */
+  setFavoritesOnly(active: boolean){
+    this.favoritesOnly = active;
+    this.renderCurrentSelection();
+  }
+
+  /** Reemplaza los datos de la fuente de gasolineras (llamado tras cada búsqueda/filtro). */
+  setOilStations(collection: OilStationsCollection){
+    this.latestFetchedCollection = collection;
+    this.renderCurrentSelection();
+  }
+
+  private renderCurrentSelection(){
+    if(!this.latestFetchedCollection){
+      return;
+    }
+
+    const collection = this.favoritesOnly
+      ? {
+          type: 'FeatureCollection' as const,
+          features: this.latestFetchedCollection.features.filter(f => this.favoritesService.isFavorite(f.properties.id))
+        }
+      : this.latestFetchedCollection;
+
+    this.applyOilStations(collection);
+  }
+
+  private applyOilStations(collection: OilStationsCollection){
+    const source = this.map?.getSource(OIL_STATIONS_SOURCE) as GeoJSONSource | undefined;
+
+    if(!source){
+      // El mapa (o sus capas) todavía no están listos: se aplicará en
+      // cuanto termine de cargar, ver setMap().
+      this.pendingOilStations = collection;
+      return;
+    }
+
+    this.pendingOilStations = undefined;
+    this.renderedOilStations = collection;
+    source.setData(collection as any);
+  }
+
+  private onClusterClick(e: MapLayerMouseEvent){
+    const feature = e.features?.[0];
+    const clusterId = feature?.properties?.['cluster_id'];
+    if(!this.map || !feature || clusterId == null){
+      return;
+    }
+
+    const source = this.map.getSource(OIL_STATIONS_SOURCE) as GeoJSONSource;
+    source.getClusterExpansionZoom(clusterId).then(zoom => {
+      this.map?.easeTo({
+        center: (feature.geometry as GeoJSON.Point).coordinates as LngLatLike,
+        zoom
+      });
+    }).catch(() => {});
+  }
+
+  private onStationClick(e: MapLayerMouseEvent){
+    const feature = e.features?.[0];
+    if(!this.map || !feature){
+      return;
+    }
+
+    const props = feature.properties as OilStationProperties;
+    const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+
+    this.stationPopup?.remove();
+    this.stationPopup = new Popup()
+      .setLngLat([lng, lat])
+      .setDOMContent(this.buildStationPopupElement(props, [lng, lat]))
+      .addTo(this.map);
+  }
+
+  /**
+   * Contenido del popup de una gasolinera: favorito, horario, precios (con
+   * el combustible seleccionado destacado) y un botón para pedir ruta hasta
+   * allí. Se construye como elementos DOM reales (no HTML en string) para
+   * poder engancharle listeners de clic sin depender de Angular dentro del popup.
+   */
+  private buildStationPopupElement(props: OilStationProperties, destination: [number, number]): HTMLElement {
+    const container = document.createElement('div');
+    container.style.textAlign = 'center';
+    container.style.minWidth = '180px';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.justifyContent = 'center';
+    header.style.gap = '6px';
+
+    const title = document.createElement('h6');
+    title.style.margin = '0';
+    title.innerHTML = `<strong>${ props.Estacion ?? '' }</strong>`;
+
+    const favoriteBtn = document.createElement('button');
+    favoriteBtn.type = 'button';
+    favoriteBtn.title = 'Marcar como favorita';
+    favoriteBtn.style.border = 'none';
+    favoriteBtn.style.background = 'none';
+    favoriteBtn.style.cursor = 'pointer';
+    favoriteBtn.style.fontSize = '1.1rem';
+    favoriteBtn.style.lineHeight = '1';
+
+    const applyStar = (isFavorite: boolean) => {
+      favoriteBtn.textContent = isFavorite ? '★' : '☆';
+      favoriteBtn.style.color = isFavorite ? '#fdd835' : 'inherit';
+    };
+    applyStar(this.favoritesService.isFavorite(props.id));
+
+    favoriteBtn.addEventListener('click', () => applyStar(this.favoritesService.toggle(props.id)));
+
+    header.append(title, favoriteBtn);
+    container.appendChild(header);
+
+    const schedule = describeSchedule(props.Horario);
+    const scheduleLine = document.createElement('span');
+    scheduleLine.style.display = 'block';
+    scheduleLine.style.fontSize = '0.85rem';
+    scheduleLine.style.opacity = '0.85';
+    if(schedule.isOpenNow !== undefined){
+      scheduleLine.style.color = schedule.isOpenNow ? '#66bb6a' : '#ef5350';
+    }
+    scheduleLine.textContent = schedule.label;
+    container.appendChild(scheduleLine);
+
+    const priceLines: Array<[FuelKey, string]> = [
+      ['gasoleo_a', 'Gasóleo A'],
+      ['gasoleo_premium', 'Gasóleo Premium'],
+      ['gasolina_95', 'Gasolina 95'],
+      ['gasolina_98', 'Gasolina 98']
+    ];
+
+    for(const [fuel, label] of priceLines){
+      const price = props[FUEL_PROPERTY[fuel] as keyof OilStationProperties] as number | undefined;
+      if(price == null){
+        continue;
+      }
+      const line = document.createElement('span');
+      line.style.display = 'block';
+      // El combustible seleccionado en el filtro se resalta, es el que se está comparando.
+      if(fuel === this.selectedFuel){
+        line.style.fontWeight = 'bold';
+      }
+      line.textContent = `${ label }: ${ this.currencyPipe.transform(price, 'EUR') }`;
+      container.appendChild(line);
+    }
+
+    if(this.directionsRequestHandler){
+      const directionsBtn = document.createElement('button');
+      directionsBtn.type = 'button';
+      directionsBtn.textContent = 'Cómo llegar';
+      directionsBtn.style.marginTop = '8px';
+      directionsBtn.style.width = '100%';
+      directionsBtn.style.padding = '4px 0';
+      directionsBtn.style.border = '1px solid #75bef8';
+      directionsBtn.style.borderRadius = '3px';
+      directionsBtn.style.background = 'none';
+      directionsBtn.style.color = 'inherit';
+      directionsBtn.style.cursor = 'pointer';
+      directionsBtn.addEventListener('click', () => {
+        this.directionsRequestHandler?.(destination);
+        this.stationPopup?.remove();
+      });
+      container.appendChild(directionsBtn);
+    }
+
+    return container;
+  }
+
   getRoutBetweenPoints(start: [number, number], end: [number, number]){
-    this.directionsApi.get<DirectionsResponse>(`/${start.join(',')};${end.join(',')}`)
+    this.directionsApi.getRoute(start, end)
       .subscribe(resp => this.drawPolyline(resp.routes[0]));
   }
 
   private drawPolyline(route: Route){
-    //console.log({distance: route.distance/1000, duration: route.duration/60})
-
     if(!this.map){
       throw Error('No hay mapa disponible');
     }
@@ -160,8 +463,8 @@ export class MapService {
       padding:200
     });
 
-    // Polyline (google maps) Linestring (Mapbox)
-    const sourceData: AnySourceData = {
+    // Polyline (google maps) Linestring (MapLibre)
+    const sourceData: GeoJSONSourceSpecification = {
       type: 'geojson',
       data: {
         type: 'FeatureCollection',
@@ -202,6 +505,98 @@ export class MapService {
       }
     });
 
+    this.highlightCheapestOnRoute(coords);
+  }
+
+  /**
+   * Busca, entre las gasolineras actualmente pintadas en el mapa, la más
+   * barata (según el combustible seleccionado) a menos de ROUTE_BUFFER_KM de
+   * la ruta dibujada, y la marca con un pin distinto. Usa la distancia al
+   * vértice de ruta más cercano como aproximación (las rutas de OSRM
+   * traen suficientes puntos intermedios para que sea representativo, sin
+   * tener que proyectar sobre cada segmento).
+   */
+  private highlightCheapestOnRoute(routeCoords: number[][]){
+    this.cheapestOnRouteMarker?.remove();
+    this.cheapestOnRouteMarker = undefined;
+
+    if(!this.map || !this.renderedOilStations || routeCoords.length === 0){
+      return;
+    }
+
+    const fuelField = FUEL_PROPERTY[this.selectedFuel] as keyof OilStationProperties;
+
+    const routeBounds = new LngLatBounds();
+    routeCoords.forEach(coord => routeBounds.extend(coord as [number, number]));
+    const searchBounds = this.padBounds(routeBounds, ROUTE_BUFFER_KM);
+
+    let cheapest: OilStationFeature | undefined;
+    let cheapestPrice = Infinity;
+
+    for(const feature of this.renderedOilStations.features){
+      const price = feature.properties[fuelField] as number | undefined;
+      if(price == null || price >= cheapestPrice){
+        continue;
+      }
+
+      const [lng, lat] = feature.geometry.coordinates;
+      if(!searchBounds.contains([lng, lat])){
+        continue;
+      }
+
+      const nearRoute = routeCoords.some(coord => this.haversineKm(coord, [lng, lat]) <= ROUTE_BUFFER_KM);
+      if(!nearRoute){
+        continue;
+      }
+
+      cheapest = feature;
+      cheapestPrice = price;
+    }
+
+    if(!cheapest){
+      return;
+    }
+
+    const [lng, lat] = cheapest.geometry.coordinates;
+    const popup = new Popup({ closeButton: false })
+      .setHTML(`
+        <div style="text-align: center">
+          <strong>Más barata en tu ruta</strong><br>
+          ${ cheapest.properties.Estacion ?? '' }<br>
+          ${ FUEL_LABEL[this.selectedFuel] }: ${ this.currencyPipe.transform(cheapestPrice, 'EUR') }
+        </div>
+      `);
+
+    this.cheapestOnRouteMarker = new Marker({ color: '#fdd835' })
+      .setLngLat([lng, lat])
+      .setPopup(popup)
+      .addTo(this.map);
+  }
+
+  private padBounds(bounds: LngLatBounds, km: number): LngLatBounds {
+    const latPad = km / 111;
+    const centerLat = bounds.getCenter().lat;
+    const lonPad = km / (111 * Math.cos(centerLat * Math.PI / 180) || 1);
+
+    return new LngLatBounds(
+      [bounds.getWest() - lonPad, bounds.getSouth() - latPad],
+      [bounds.getEast() + lonPad, bounds.getNorth() + latPad]
+    );
+  }
+
+  private haversineKm(a: number[], b: number[]): number {
+    const toRad = (deg: number) => deg * Math.PI / 180;
+    const [lon1, lat1] = a;
+    const [lon2, lat2] = b;
+    const R = 6371;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const h = sinDLat * sinDLat + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinDLon * sinDLon;
+
+    return 2 * R * Math.asin(Math.sqrt(h));
   }
 
 }

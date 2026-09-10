@@ -11,6 +11,19 @@
 npm-debug.log
 yarn-error.log
 
+# Local Solr data (dev only)
+/.solr-home
+
+# Backend (Python)
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/.pytest_cache
+backend/.env
+
+# Claude Code runtime state
+/.claude/
+
 # IDEs and editors
 .idea/
 .project

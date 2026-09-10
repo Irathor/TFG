@@ -1,73 +1,133 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { MenuItem } from 'primeng/api';
+import { Subscription } from 'rxjs';
 
-import { GeolocationsService, MapService } from '../../services';
+import { FavoritesService, GeolocationsService, MapService } from '../../services';
 
-import { Facet } from '../../interfaces/facets';
-import { SolrRequest } from '../../interfaces/solrRequest';
+import { FacetItem } from '../../interfaces/facets';
+import { OilStationsFilter } from '../../interfaces/oilStationsFilter';
+import { FUEL_OPTIONS, FuelKey } from '../../interfaces/fuel';
+
+const NEAR_ME_RADIUS_KM = 10;
+const FILTERS_STORAGE_KEY = 'oil-stations:filtros';
+
+interface StoredFilters {
+  provincias: string[];
+  estaciones: string[];
+  precio: number[];
+  combustible: FuelKey;
+}
 
 @Component({
-  selector: 'app-map-view',
-  templateUrl: './map-view.component.html',
-  styleUrls: ['./map-view.component.css']
+    selector: 'app-map-view',
+    templateUrl: './map-view.component.html',
+    styleUrls: ['./map-view.component.css'],
+    standalone: false
 })
-export class MapViewComponent implements OnInit{
+export class MapViewComponent implements OnInit, OnDestroy {
 
-  items!: MenuItem[];
-  provincias!: Facet[];
-  estaciones!: Facet[];
-  
+  provincias: FacetItem[] = [];
+  estaciones: FacetItem[] = [];
+  fuelOptions = FUEL_OPTIONS;
+
   selectedProvincias: string[] = [];
   selectedEstaciones: string[] = [];
   selectedPrecios: number[] = [0, 3];
-  
+  selectedCombustible: FuelKey = 'gasoleo_a';
+
+  public isLoadingOilStations: boolean = false;
+  public noResults: boolean = false;
+
+  public nearMeActive: boolean = false;
+  public favoritesOnly: boolean = false;
+  public favoritesCount: number = 0;
+
+  private favoritesSubscription?: Subscription;
+
   private debounceTimer?: NodeJS.Timeout;
   public infoReady: boolean = false;
 
+  constructor(
+    private readonly geolocationsService: GeolocationsService,
+    private readonly mapService: MapService,
+    private readonly favoritesService: FavoritesService
+    ) { }
+
   ngOnInit(): void {
 
-    this.items = [
-      {
-          label: 'Centrar',
-          icon: 'pi pi-fw pi-user', id: 'botonCentrar',
-          command: () => {
-            if(!this.geolocationsService.locationReady){
-              throw Error('No se ha podido Geolocalizar');
-            }
-            if(!this.mapService.isMapReady){
-              throw Error('No hay mapa disponible');
-            }
-            this.mapService.flyto(this.geolocationsService.userLocation!);
-          }
-      }
-    ];
+    const stored = this.loadStoredFilters();
+    this.selectedProvincias = stored.provincias ?? [];
+    this.selectedEstaciones = stored.estaciones ?? [];
+    this.selectedPrecios = stored.precio ?? [0, 3];
+    this.selectedCombustible = stored.combustible ?? 'gasoleo_a';
+    this.mapService.setFuelField(this.selectedCombustible);
 
-    let solrResponse = this.geolocationsService.getOilStationsNoPaint();
+    this.favoritesCount = this.favoritesService.getAll().length;
+    this.favoritesSubscription = this.favoritesService.changes$.subscribe(
+      () => this.favoritesCount = this.favoritesService.getAll().length
+    );
 
-    solrResponse.subscribe(resp => {
+    // Listas para los desplegables de filtro (siempre sobre el dataset completo).
+    this.geolocationsService.getFacets().subscribe(facets => {
+      this.provincias = facets.provincias;
+      this.estaciones = facets.estaciones;
+    });
 
-      this.provincias = [];
-      this.estaciones = [];
-
-      for (let i = 0; i < resp.facet_counts.facet_fields.Provincia_str.length; i += 2) {
-        let facetProvincias: Facet={name: resp.facet_counts.facet_fields.Provincia_str[i].toString(), count: Number(resp.facet_counts.facet_fields.Provincia_str[i + 1])};
-        let facetEstaciones: Facet={name: resp.facet_counts.facet_fields.Estacion_str[i].toString(), count: Number(resp.facet_counts.facet_fields.Estacion_str[i + 1])};
-        this.provincias.push(facetProvincias);
-        this.estaciones.push(facetEstaciones);
-      }
-
-    })
+    // Con el clustering ya no hace falta esperar a que el usuario filtre:
+    // se muestran todas las gasolineras desde el principio (respetando
+    // los filtros recordados de la última visita, si los había).
+    this.applyFilters();
 
   }
 
-  constructor(
-    private geolocationsService: GeolocationsService,
-    private mapService: MapService
-    ) { }
+  ngOnDestroy(): void {
+    this.favoritesSubscription?.unsubscribe();
+  }
 
   get locationReady(){
     return this.geolocationsService.locationReady;
+  }
+
+  /** true si estamos mostrando Madrid por defecto porque no se pudo geolocalizar al usuario. */
+  get usingDefaultLocation(){
+    return this.geolocationsService.usingDefaultLocation;
+  }
+
+  centrarMapa(){
+    if(!this.geolocationsService.locationReady){
+      throw Error('No se ha podido Geolocalizar');
+    }
+    if(!this.mapService.isMapReady){
+      throw Error('No hay mapa disponible');
+    }
+    this.mapService.flyto(this.geolocationsService.userLocation!);
+  }
+
+  toggleNearMe(){
+    if(!this.geolocationsService.userLocation){
+      throw Error('No se ha podido Geolocalizar');
+    }
+
+    this.nearMeActive = !this.nearMeActive;
+    this.applyFilters();
+  }
+
+  toggleFavoritesOnly(){
+    this.favoritesOnly = !this.favoritesOnly;
+    this.mapService.setFavoritesOnly(this.favoritesOnly);
+
+    if(this.favoritesOnly){
+      // Las favoritas deben verse aunque no encajen con los filtros activos
+      // (provincia, precio...): se piden todas y MapService se encarga de
+      // quedarse solo con las marcadas como favoritas.
+      this.isLoadingOilStations = true;
+      this.geolocationsService.getOilStations({}).subscribe(() => {
+        this.isLoadingOilStations = false;
+        this.noResults = this.favoritesCount === 0;
+      });
+    }else{
+      this.applyFilters();
+    }
   }
 
   onQueryChanged(query: string = ''){
@@ -86,26 +146,74 @@ export class MapViewComponent implements OnInit{
   }
 
   selectProvincia(event: any){
-
-    let req: SolrRequest = {provincias: event.value.map((item: any) => item.name), estaciones: this.selectedEstaciones.map((item: any) => item.name), precio: this.selectedPrecios};
-
-    this.geolocationsService.getOilStations(req).subscribe();
-
+    this.applyFilters({ provincias: event.value });
   }
 
   selectEstacion(event: any){
-
-    let req: SolrRequest = {provincias: this.selectedProvincias.map((item: any) => item.name), estaciones: event.value.map((item: any) => item.name), precio: this.selectedPrecios};
-
-    this.geolocationsService.getOilStations(req).subscribe();
-
+    this.applyFilters({ estaciones: event.value });
   }
 
   selectPrecio(event: any){
+    this.applyFilters({ precio: event.values });
+  }
 
-    let req: SolrRequest = {provincias: this.selectedProvincias.map((item: any) => item.name), estaciones: this.selectedEstaciones.map((item: any) => item.name), precio: event.values};
+  selectCombustible(event: any){
+    this.selectedCombustible = event.value;
+    this.mapService.setFuelField(this.selectedCombustible);
+    this.applyFilters();
+  }
 
-    this.geolocationsService.getOilStations(req).subscribe();
+  /** Reconstruye el filtro combinando provincia/estación/precio/combustible con "cerca de mí" (si está activo), lo aplica y lo recuerda. */
+  private applyFilters(overrides: Partial<Pick<OilStationsFilter, 'provincias' | 'estaciones' | 'precio'>> = {}){
+    this.selectedProvincias = overrides.provincias ?? this.selectedProvincias;
+    this.selectedEstaciones = overrides.estaciones ?? this.selectedEstaciones;
+    this.selectedPrecios = overrides.precio ?? this.selectedPrecios;
+
+    const filter: OilStationsFilter = {
+      provincias: this.selectedProvincias,
+      estaciones: this.selectedEstaciones,
+      precio: this.selectedPrecios,
+      combustible: this.selectedCombustible,
+    };
+
+    if(this.nearMeActive && this.geolocationsService.userLocation){
+      const [lon, lat] = this.geolocationsService.userLocation;
+      filter.cercaDe = { lat, lon, radioKm: NEAR_ME_RADIUS_KM };
+    }
+
+    this.isLoadingOilStations = true;
+    this.noResults = false;
+
+    this.geolocationsService.getOilStations(filter).subscribe(collection => {
+      this.isLoadingOilStations = false;
+      this.noResults = collection.features.length === 0;
+    });
+
+    this.persistFilters();
+  }
+
+  private loadStoredFilters(): Partial<StoredFilters> {
+    try {
+      const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      // localStorage puede no estar disponible (modo privado, cuota llena...); se empieza sin filtros guardados.
+      return {};
+    }
+  }
+
+  private persistFilters(){
+    try {
+      const toStore: StoredFilters = {
+        provincias: this.selectedProvincias,
+        estaciones: this.selectedEstaciones,
+        precio: this.selectedPrecios,
+        combustible: this.selectedCombustible,
+      };
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(toStore));
+    } catch {
+      // No es crítico: la sesión actual sigue funcionando aunque no se puedan recordar los filtros.
+    }
   }
 
 }

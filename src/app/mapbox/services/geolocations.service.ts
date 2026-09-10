@@ -1,12 +1,18 @@
 import { Injectable } from '@angular/core';
 
-import { PlacesResponse, Feature } from '../interfaces/places';
+import { Feature } from '../interfaces/places';
 import { MapService } from './map.service';
 import { PlacesApiClient } from '../api';
 import { OilStationsService } from './oil-stations.service';
-import { Doc, OilStations } from '../interfaces/oilstations';
+import { OilStationsCollection } from '../interfaces/oilstations';
+import { OilStationsFilter } from '../interfaces/oilStationsFilter';
+import { FacetsResponse } from '../interfaces/facets';
 import { Observable, tap } from 'rxjs';
-import { SolrRequest } from '../interfaces/solrRequest';
+
+// Centro de Madrid: punto de partida razonable cuando no hay geolocalización
+// real (permiso denegado, navegador sin soporte, error del sensor...). Antes
+// la app se quedaba bloqueada en la pantalla de carga para siempre en ese caso.
+const DEFAULT_LOCATION: [number, number] = [-3.7038, 40.4168];
 
 @Injectable({
   providedIn: 'root'
@@ -14,6 +20,9 @@ import { SolrRequest } from '../interfaces/solrRequest';
 export class GeolocationsService {
 
   userLocation?:[number,number];
+
+  /** true si `userLocation` es el centro de Madrid por defecto, no la posición real del usuario. */
+  public usingDefaultLocation: boolean = false;
 
   public isLoadingPlaces: boolean = false;
   public places: Feature[] = [];
@@ -24,26 +33,48 @@ export class GeolocationsService {
   }
 
   constructor(
-    private placesApi: PlacesApiClient,
-    private mapService: MapService,
-    private oilStations: OilStationsService
+    private readonly placesApi: PlacesApiClient,
+    private readonly mapService: MapService,
+    private readonly oilStations: OilStationsService
     ) {
     this.getUserLocation(); //Llamamos la función para obtener la geolocalización del usuario una vez nada más se haga uso de este servicio
+
+    // El botón "Cómo llegar" del popup de una gasolinera vive en MapService,
+    // pero necesita la posición del usuario, que solo conoce este servicio.
+    // Con este hook evitamos que MapService tenga que inyectar de vuelta a
+    // GeolocationsService (dependencia circular entre ambos).
+    this.mapService.setDirectionsHandler(destination => {
+      if(this.userLocation){
+        this.mapService.getRoutBetweenPoints(this.userLocation, destination);
+      }
+    });
    }
 
   public async getUserLocation(): Promise<[number,number]> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      if(!navigator.geolocation){
+        resolve(this.useDefaultLocation());
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         ({coords})=> { //Desestructuro los datos de entrada para tomar el que necesito, las coordenadas
           this.userLocation = [coords.longitude, coords.latitude];
-          resolve(this.userLocation); 
+          resolve(this.userLocation);
         },
-        (e) => {
-          alert(e);
-          reject();
+        () => {
+          // Sin permiso o sin datos de posición: no bloqueamos la app, usamos
+          // un centro por defecto en vez de dejar la pantalla de carga infinita.
+          resolve(this.useDefaultLocation());
         }
       );
     });
+  }
+
+  private useDefaultLocation(): [number, number] {
+    this.userLocation = DEFAULT_LOCATION;
+    this.usingDefaultLocation = true;
+    return this.userLocation;
   }
 
   getPlacesByQuery(query:string = ''){
@@ -60,11 +91,7 @@ export class GeolocationsService {
 
     this.isLoadingPlaces = true;
 
-    this.placesApi.get<PlacesResponse>(`/${query}.json`, {
-      params:{
-        proximity: this.userLocation.join(',')
-      }
-    }).subscribe(resp => {
+    this.placesApi.search(query, this.userLocation).subscribe(resp => {
         this.isLoadingPlaces=false;
         this.places=resp.features;
 
@@ -73,29 +100,14 @@ export class GeolocationsService {
       });
   }
 
-  getOilStations(req: SolrRequest = {}): Observable<OilStations> {
-    let oilStationLocation: Array<Doc> = [];
-
-    return this.oilStations.getOilStationsInfo(req).pipe(
-      tap(resp => {
-        resp.response.docs.forEach((doc)=>{
-          oilStationLocation.push(doc);
-        })
-        this.mapService.createMarkersFromOilStations(oilStationLocation);
-      })
+  getOilStations(filter: OilStationsFilter = {}): Observable<OilStationsCollection> {
+    return this.oilStations.getOilStationsInfo(filter).pipe(
+      tap(collection => this.mapService.setOilStations(collection))
     );
   }
 
-  getOilStationsNoPaint(req: SolrRequest = {}): Observable<OilStations> {
-    let oilStationLocation: Array<Doc> = [];
-
-    return this.oilStations.getOilStationsInfo(req).pipe(
-      tap(resp => {
-        resp.response.docs.forEach((doc)=>{
-          oilStationLocation.push(doc);
-        })
-      })
-    );
+  getFacets(): Observable<FacetsResponse> {
+    return this.oilStations.getFacets();
   }
 
   hideMenuPlaces(){

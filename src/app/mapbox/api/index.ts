@@ -1,3 +1,3 @@
 export { DirectionsApiClient } from './directionsApiClient';
 export { PlacesApiClient } from './placesApiClient';
-export { SolrApiClient } from './solrApiClient';
+export { OilStationsApiClient } from './oilStationsApiClient';

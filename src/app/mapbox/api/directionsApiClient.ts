@@ -1,33 +1,31 @@
-import { HttpClient, HttpHandler } from "@angular/common/http";
+import { HttpClient, HttpParams } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { environment } from '../../../environments/environment.prod';
+import { Observable } from "rxjs";
+
+import { DirectionsResponse } from "../interfaces/directions";
+
+// Servidor de demostración público de OSRM (patrocinado por FOSSGIS), gratuito
+// y sin token — uso razonable, no pensado para tráfico de producción intenso.
+// https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server
+const OSRM_URL = "https://router.project-osrm.org/route/v1/driving";
 
 @Injectable({
     providedIn: 'root'
 })
-export class DirectionsApiClient extends HttpClient {
-    
-    public baseUrl: string = 'https://api.mapbox.com/directions/v5/mapbox/driving';
+export class DirectionsApiClient {
 
-    constructor( handler: HttpHandler ) {
-        super(handler);
-    }
+    constructor(private readonly http: HttpClient) { }
 
-    public override get<T>( url: string ){
+    getRoute(start: [number, number], end: [number, number]): Observable<DirectionsResponse> {
+        const coords = `${ start.join(',') };${ end.join(',') }`;
 
-        url = this.baseUrl + url;
+        const params = new HttpParams()
+            .set('alternatives', 'false')
+            .set('geometries', 'geojson')
+            .set('overview', 'full')
+            .set('steps', 'false');
 
-        return super.get<T>( url, {
-            params: {
-                alternatives: false,
-                geometries: 'geojson',
-                language: 'es',
-                overview: 'simplified',
-                steps: 'false',
-                access_token: environment.apiKey
-            }
-        });
-
+        return this.http.get<DirectionsResponse>(`${ OSRM_URL }/${ coords }`, { params });
     }
 
 }

@@ -1,4 +1,9 @@
-export interface Facet{
-    name: string,
-    count: number
+export interface FacetItem {
+    name: string;
+    count: number;
+}
+
+export interface FacetsResponse {
+    provincias: FacetItem[];
+    estaciones: FacetItem[];
 }

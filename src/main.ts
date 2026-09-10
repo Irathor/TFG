@@ -1,22 +1,21 @@
-import { enableProdMode } from '@angular/core';
+import { provideZoneChangeDetection } from '@angular/core';
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
 import { AppModule } from './app/app.module';
-import { environment } from './environments/environment';
 
-import Mapboxgl from 'mapbox-gl'; // or "const mapboxgl = require('mapbox-gl');"
- 
-Mapboxgl.accessToken = 'pk.eyJ1IjoiaXJhdGhvciIsImEiOiJjbDZhcm44YjUwOXJ0M2RucHVvMHlhaWw1In0.fCGrrS344j7mpV4X7UdX0Q';
+// MapLibre GL JS no necesita ningún token: el estilo del mapa se sirve
+// gratis desde OpenFreeMap (ver map.component.ts).
+
+// Nota: no hace falta enableProdMode() — el build de producción de Angular CLI
+// ya elimina el código de solo-desarrollo a nivel de compilación (Ivy), la
+// llamada en tiempo de ejecución es un no-op heredado de versiones antiguas.
 
 if (!navigator.geolocation) {
   alert('No se puede geolocalizar'); //Mostrar el error al usuario
   throw new Error('No se puede geolocalizar'); //Mostrar el error por consola
 }
 
-//Renderizado de la aplicación
-if (environment.production) {
-  enableProdMode();
-}
-
-platformBrowserDynamic().bootstrapModule(AppModule)
+platformBrowserDynamic().bootstrapModule(AppModule, {
+    applicationProviders: [provideZoneChangeDetection({ eventCoalescing: true })],
+  })
   .catch(err => console.error(err));
