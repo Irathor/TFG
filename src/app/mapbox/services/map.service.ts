@@ -28,6 +28,15 @@ const UNCLUSTERED_LAYER = 'oil-stations-unclustered';
 const DEFAULT_FUEL: FuelKey = 'gasoleo_a';
 const ROUTE_BUFFER_KM = 2;
 
+// Estilos gratuitos de OpenFreeMap (sin token ni registro): "dark" es el
+// oscuro que se usaba hasta ahora, "liberty" es su estilo con los colores
+// clásicos de mapa (el "modo normal" que se puede elegir desde el selector).
+export const MAP_STYLE_DARK_URL = 'https://tiles.openfreemap.org/styles/dark';
+export const MAP_STYLE_LIGHT_URL = 'https://tiles.openfreemap.org/styles/liberty';
+
+export type MapStyleMode = 'dark' | 'light';
+const MAP_STYLE_STORAGE_KEY = 'oil-stations:estilo-mapa';
+
 // Color por marca para los puntos individuales (mismo criterio que antes,
 // ahora expresado como una expresión del estilo en vez de JS por marcador).
 const BRAND_COLOR_MATCH: any[] = [
@@ -100,8 +109,19 @@ export class MapService {
   // (evita una dependencia circular entre ambos servicios).
   private directionsRequestHandler?: (destination: [number, number]) => void;
 
+  private styleMode: MapStyleMode = this.loadStoredStyleMode();
+
   get isMapReady(){
     return !!this.map;
+  }
+
+  /** URL de estilo con la que crear el mapa (map.component.ts), respetando la preferencia guardada. */
+  get initialStyleUrl(): string {
+    return this.styleMode === 'light' ? MAP_STYLE_LIGHT_URL : MAP_STYLE_DARK_URL;
+  }
+
+  get currentStyleMode(): MapStyleMode {
+    return this.styleMode;
   }
 
   constructor(
@@ -118,6 +138,45 @@ export class MapService {
         this.applyOilStations(this.pendingOilStations);
       }
     });
+  }
+
+  /** Alterna entre el estilo oscuro y el estilo "normal" del mapa, y recuerda la elección. */
+  toggleMapStyle(){
+    this.styleMode = this.styleMode === 'dark' ? 'light' : 'dark';
+
+    try {
+      localStorage.setItem(MAP_STYLE_STORAGE_KEY, this.styleMode);
+    } catch {
+      // No es crítico: simplemente no se recordará la preferencia entre visitas.
+    }
+
+    if(!this.map){
+      return;
+    }
+
+    this.map.setStyle(this.initialStyleUrl);
+
+    // setStyle() sustituye el estilo entero, así que borra la fuente y las
+    // capas de gasolineras: hay que volver a registrarlas y repintar los
+    // datos ya cargados en cuanto el nuevo estilo termine de cargar. La ruta
+    // dibujada (si la había) se pierde igual que las capas del estilo
+    // anterior; no merece la pena reconstruirla solo por un cambio de tema.
+    this.map.once('style.load', () => {
+      this.setupOilStationsLayers();
+      if(this.renderedOilStations){
+        this.applyOilStations(this.renderedOilStations);
+      }
+      this.cheapestOnRouteMarker?.remove();
+      this.cheapestOnRouteMarker = undefined;
+    });
+  }
+
+  private loadStoredStyleMode(): MapStyleMode {
+    try {
+      return localStorage.getItem(MAP_STYLE_STORAGE_KEY) === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
   }
 
   setDirectionsHandler(handler: (destination: [number, number]) => void){

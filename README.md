@@ -123,7 +123,8 @@ de más — nunca un mapa vacío.
 - **Fallback de geolocalización**: si se deniega el permiso o el navegador no la soporta, la app centra en Madrid en vez de quedarse bloqueada en la pantalla de carga, con un aviso visible que se desvanece solo a los 5 segundos (`fadeOutLocationNotice` en `map-view.component.css`) para no quedar estorbando de forma permanente.
 - **Filtros recordados**: provincia, marca, precio y combustible se guardan en `localStorage` y se restauran en la siguiente visita.
 - **Feedback de carga y de "sin resultados"**: spinner mientras se pide al backend, aviso si una combinación de filtros no devuelve ninguna gasolinera.
-- **Menú superior discreto**: si el ratón lleva 3 segundos fuera del menú de filtros, este se atenúa (opacidad 0,35) para dejar más protagonismo al mapa, y recupera su opacidad completa en 0,5s en cuanto el ratón vuelve a pasar por encima (`.menu` en `map-view.component.css`, con `:hover` + `animation-delay`).
+- **Menú superior discreto**: si el ratón lleva 3 segundos fuera del menú de filtros, este se vuelve un 80% transparente (opacidad 0,2) para dejar más protagonismo al mapa, y recupera su opacidad completa en 0,5s en cuanto el ratón vuelve a pasar por encima (`.card` en `map-view.component.css`, con `:hover` + `animation-delay`).
+- **Mapa oscuro o normal**: un selector junto a "Favoritas" alterna entre el estilo oscuro de OpenFreeMap y su estilo "liberty" (colores clásicos de mapa), sin perder las gasolineras ya cargadas ni la posición del mapa. La elección se recuerda en `localStorage`.
 - **Responsive**: la barra de filtros se adapta (se apila) en pantallas estrechas.
 
 ## Rendimiento

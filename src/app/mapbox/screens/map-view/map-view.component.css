@@ -3,6 +3,10 @@
     margin: 0 auto;
     margin-top: 10px;
     border-color: #75bef8;
+    /* Sin esto, el fondo blanco por defecto del div se ve a través del menú
+       cuando este se vuelve translúcido (en vez del mapa, que está detrás). */
+    background-color: transparent;
+    transition: opacity 0.5s ease;
 }
 
 app-search-results {
@@ -128,24 +132,27 @@ app-search-results {
     to{ opacity: 0; }
 }
 
-/* El menú superior se atenúa cuando el ratón lleva 3s fuera de él, y vuelve
-   a ser sólido en 0,5s en cuanto el ratón vuelve a pasar por encima. */
-.menu{
-    transition: opacity 0.5s ease;
-}
-
-.menu:not(:hover){
+/* El menú superior (fondo, borde azul, texto, iconos, desplegables... todo)
+   se vuelve un 80% transparente cuando el ratón lleva 3s fuera de él, y
+   recupera su aspecto sólido en 0,5s en cuanto el ratón vuelve a pasar por
+   encima. La animación va en .card (no en .menu): el borde azul que se ve
+   es el de .card (heredado de la clase "card" de Bootstrap), no el de
+   .menu/p-menubar, así que aplicarlo solo a .menu dejaba ese borde siempre
+   sólido. Aplicándolo en .card entero se desvanece de una sola vez, sin
+   apilar dos opacidades (una en .card y otra en .menu, que se multiplicarían
+   y dejarían el resultado demasiado transparente).*/
+.card:not(:hover){
     animation: menuFadeToTranslucent 0.5s ease forwards;
     animation-delay: 3s;
 }
 
-.menu:hover{
+.card:hover{
     opacity: 1;
 }
 
 @keyframes menuFadeToTranslucent{
     from{ opacity: 1; }
-    to{ opacity: 0.35; }
+    to{ opacity: 0.2; }
 }
 
 .oil-stations-status{

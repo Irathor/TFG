@@ -3,10 +3,6 @@ import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { Map, Marker, Popup } from 'maplibre-gl';
 import { GeolocationsService, MapService } from '../../services';
 
-// Estilo oscuro de OpenFreeMap: gratuito, sin token ni registro.
-// https://openfreemap.org
-const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
-
 @Component({
     selector: 'app-map',
     templateUrl: './map.component.html',
@@ -31,7 +27,7 @@ export class MapComponent implements AfterViewInit {
 
     const map = new Map({
       container: this.principalElement?.nativeElement,
-      style: MAP_STYLE_URL,
+      style: this.mapService.initialStyleUrl,
       center: this.geolocationsService.userLocation,
       zoom: 14
     });
@@ -41,7 +37,7 @@ export class MapComponent implements AfterViewInit {
       .setHTML(`<strong>${this.geolocationsService.userLocation}</strong>`);
 
 
-    new Marker({color: '#FFDAB9'})
+    new Marker({color: '#e53935'})
       .setLngLat(this.geolocationsService.userLocation)
       .setPopup(popup)
       .addTo(map)

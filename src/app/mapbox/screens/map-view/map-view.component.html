@@ -102,6 +102,12 @@
             <span class="favorites-badge">{{ favoritesCount }}</span>
           }
         </button>
+        <button type="button" class="icon-action-btn"
+          pTooltip="Cambiar entre mapa oscuro y mapa normal" tooltipPosition="bottom"
+          aria-label="Cambiar el estilo del mapa"
+          (click)="toggleMapStyle()">
+          <i class="pi" [class.pi-sun]="isDarkMap" [class.pi-moon]="!isDarkMap"></i>
+        </button>
       </div>
 
       <p-iconfield iconPosition="left">

@@ -112,6 +112,15 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
+  /** true si el mapa está en el estilo oscuro (el otro es el estilo "normal", con los colores clásicos de mapa). */
+  get isDarkMap(): boolean {
+    return this.mapService.currentStyleMode === 'dark';
+  }
+
+  toggleMapStyle(){
+    this.mapService.toggleMapStyle();
+  }
+
   toggleFavoritesOnly(){
     this.favoritesOnly = !this.favoritesOnly;
     this.mapService.setFavoritesOnly(this.favoritesOnly);
